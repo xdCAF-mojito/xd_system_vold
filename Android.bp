@@ -110,7 +110,6 @@ cc_library_static {
     srcs: [
         "AppFuseUtil.cpp",
         "Benchmark.cpp",
-        "CheckEncryption.cpp",
         "Checkpoint.cpp",
         "CryptoType.cpp",
         "Devmapper.cpp",
@@ -149,15 +148,6 @@ cc_library_static {
         "model/VolumeEncryption.cpp",
     ],
     product_variables: {
-        arc: {
-            exclude_srcs: [
-                "model/ObbVolume.cpp",
-            ],
-            static_libs: [
-                "arc_services_aidl",
-                "libarcobbvolume",
-            ],
-        },
         debuggable: {
             cppflags: ["-D__ANDROID_DEBUGGABLE__"],
         },
@@ -189,12 +179,6 @@ cc_binary {
     srcs: ["main.cpp"],
     static_libs: ["libvold"],
     product_variables: {
-        arc: {
-            static_libs: [
-                "arc_services_aidl",
-                "libarcobbvolume",
-            ],
-        },
         device_support_hwfde: {
             shared_libs: ["libcryptfs_hw"],
         },
