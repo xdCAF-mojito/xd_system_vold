@@ -30,7 +30,6 @@
 #include <thread>
 
 #include "Benchmark.h"
-#include "CheckEncryption.h"
 #include "Checkpoint.h"
 #include "FsCrypt.h"
 #include "IdleMaint.h"
@@ -282,12 +281,6 @@ binder::Status VoldNativeService::mount(
         return translate(res);
     }
 
-    if ((mountFlags & MOUNT_FLAG_PRIMARY) != 0) {
-        res = VolumeManager::Instance()->setPrimary(vol);
-        if (res != OK) {
-            return translate(res);
-        }
-    }
     return translate(OK);
 }
 
@@ -349,17 +342,6 @@ binder::Status VoldNativeService::benchmark(
 
     std::thread([=]() { android::vold::Benchmark(path, listener); }).detach();
     return Ok();
-}
-
-binder::Status VoldNativeService::checkEncryption(const std::string& volId) {
-    ENFORCE_SYSTEM_OR_ROOT;
-    CHECK_ARGUMENT_ID(volId);
-    ACQUIRE_LOCK;
-
-    std::string path;
-    auto status = pathForVolId(volId, &path);
-    if (!status.isOk()) return status;
-    return translate(android::vold::CheckEncryption(path));
 }
 
 binder::Status VoldNativeService::moveStorage(
@@ -752,7 +734,7 @@ binder::Status VoldNativeService::lockUserKey(int32_t userId) {
     return translateBool(fscrypt_lock_user_key(userId));
 }
 
-binder::Status VoldNativeService::prepareUserStorage(const std::unique_ptr<std::string>& uuid,
+binder::Status VoldNativeService::prepareUserStorage(const std::optional<std::string>& uuid,
                                                      int32_t userId, int32_t userSerial,
                                                      int32_t flags) {
     ENFORCE_SYSTEM_OR_ROOT;
@@ -764,7 +746,7 @@ binder::Status VoldNativeService::prepareUserStorage(const std::unique_ptr<std::
     return translateBool(fscrypt_prepare_user_storage(uuid_, userId, userSerial, flags));
 }
 
-binder::Status VoldNativeService::destroyUserStorage(const std::unique_ptr<std::string>& uuid,
+binder::Status VoldNativeService::destroyUserStorage(const std::optional<std::string>& uuid,
                                                      int32_t userId, int32_t flags) {
     ENFORCE_SYSTEM_OR_ROOT;
     std::string empty_string = "";
