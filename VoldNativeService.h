@@ -59,7 +59,6 @@ class VoldNativeService : public BinderService<VoldNativeService>, public os::Bn
     binder::Status format(const std::string& volId, const std::string& fsType);
     binder::Status benchmark(const std::string& volId,
                              const android::sp<android::os::IVoldTaskListener>& listener);
-    binder::Status checkEncryption(const std::string& volId);
 
     binder::Status moveStorage(const std::string& fromVolId, const std::string& toVolId,
                                const android::sp<android::os::IVoldTaskListener>& listener);
@@ -128,9 +127,9 @@ class VoldNativeService : public BinderService<VoldNativeService>, public os::Bn
                                  const std::string& secret);
     binder::Status lockUserKey(int32_t userId);
 
-    binder::Status prepareUserStorage(const std::unique_ptr<std::string>& uuid, int32_t userId,
+    binder::Status prepareUserStorage(const std::optional<std::string>& uuid, int32_t userId,
                                       int32_t userSerial, int32_t flags);
-    binder::Status destroyUserStorage(const std::unique_ptr<std::string>& uuid, int32_t userId,
+    binder::Status destroyUserStorage(const std::optional<std::string>& uuid, int32_t userId,
                                       int32_t flags);
 
     binder::Status prepareSandboxForApp(const std::string& packageName, int32_t appId,
