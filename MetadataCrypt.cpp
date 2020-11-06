@@ -35,6 +35,7 @@
 #include <cutils/fs.h>
 #include <fs_mgr.h>
 #include <libdm/dm.h>
+#include <libgsi/libgsi.h>
 
 #include "Checkpoint.h"
 #include "CryptoType.h"
@@ -45,8 +46,6 @@
 #include "Keymaster.h"
 #include "Utils.h"
 #include "VoldUtil.h"
-
-#define TABLE_LOAD_RETRIES 10
 
 namespace android {
 namespace vold {
@@ -216,18 +215,10 @@ static bool create_crypto_blk_dev(const std::string& dm_name, const std::string&
     table.AddTarget(std::move(target));
 
     auto& dm = DeviceMapper::Instance();
-    for (int i = 0;; i++) {
-        if (dm.CreateDevice(dm_name, table, crypto_blkdev, std::chrono::seconds(5))) {
-            break;
-        }
-        if (i + 1 >= TABLE_LOAD_RETRIES) {
-            PLOG(ERROR) << "Could not create default-key device " << dm_name;
-            return false;
-        }
-        PLOG(INFO) << "Could not create default-key device, retrying";
-        usleep(500000);
+    if (!dm.CreateDevice(dm_name, table, crypto_blkdev, std::chrono::seconds(5))) {
+        PLOG(ERROR) << "Could not create default-key device " << dm_name;
+        return false;
     }
-
     return true;
 }
 
@@ -317,21 +308,7 @@ bool fscrypt_mount_metadata_encrypted(const std::string& blk_device, const std::
         return false;
 
     // FIXME handle the corrupt case
-    if (needs_encrypt) {
-        LOG(INFO) << "Beginning inplace encryption, nr_sec: " << nr_sec;
-        off64_t size_already_done = 0;
-        auto rc = cryptfs_enable_inplace(crypto_blkdev.data(), blk_device.data(), nr_sec,
-                                         &size_already_done, nr_sec, 0, false);
-        if (rc != 0) {
-            LOG(ERROR) << "Inplace crypto failed with code: " << rc;
-            return false;
-        }
-        if (static_cast<uint64_t>(size_already_done) != nr_sec) {
-            LOG(ERROR) << "Inplace crypto only got up to sector: " << size_already_done;
-            return false;
-        }
-        LOG(INFO) << "Inplace encryption complete";
-    }
+    if (needs_encrypt && !encrypt_inplace(crypto_blkdev, blk_device, nr_sec, false)) return false;
 
     LOG(DEBUG) << "Mounting metadata-encrypted filesystem:" << mount_point;
     mount_via_fs_mgr(mount_point.c_str(), crypto_blkdev.c_str());
@@ -363,6 +340,45 @@ bool defaultkey_setup_ext_volume(const std::string& label, const std::string& bl
     if (!get_volume_options(&options)) return false;
     uint64_t nr_sec;
     return create_crypto_blk_dev(label, blk_device, key, options, out_crypto_blkdev, &nr_sec);
+}
+
+bool destroy_dsu_metadata_key(const std::string& dsu_slot) {
+    LOG(DEBUG) << "destroy_dsu_metadata_key: " << dsu_slot;
+
+    const auto dsu_metadata_key_dir = android::gsi::GetDsuMetadataKeyDir(dsu_slot);
+    if (!pathExists(dsu_metadata_key_dir)) {
+        LOG(DEBUG) << "DSU metadata_key_dir doesn't exist, nothing to remove: "
+                   << dsu_metadata_key_dir;
+        return true;
+    }
+
+    // Ensure that the DSU key directory is different from the host OS'.
+    // Under normal circumstances, this should never happen, but handle it just in case.
+    if (auto data_rec = GetEntryForMountPoint(&fstab_default, "/data")) {
+        if (dsu_metadata_key_dir == data_rec->metadata_key_dir) {
+            LOG(ERROR) << "DSU metadata_key_dir is same as host OS: " << dsu_metadata_key_dir;
+            return false;
+        }
+    }
+
+    bool ok = true;
+    for (auto suffix : {"/key", "/tmp"}) {
+        const auto key_path = dsu_metadata_key_dir + suffix;
+        if (pathExists(key_path)) {
+            LOG(DEBUG) << "Destroy key: " << key_path;
+            if (!android::vold::destroyKey(key_path)) {
+                LOG(ERROR) << "Failed to destroyKey(): " << key_path;
+                ok = false;
+            }
+        }
+    }
+    if (!ok) {
+        return false;
+    }
+
+    LOG(DEBUG) << "Remove DSU metadata_key_dir: " << dsu_metadata_key_dir;
+    // DeleteDirContentsAndDir() already logged any error, so don't log repeatedly.
+    return android::vold::DeleteDirContentsAndDir(dsu_metadata_key_dir) == android::OK;
 }
 
 }  // namespace vold
