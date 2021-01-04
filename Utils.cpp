@@ -199,7 +199,7 @@ int SetDefaultAcl(const std::string& path, mode_t mode, uid_t uid, gid_t gid,
 }
 
 int SetQuotaInherit(const std::string& path) {
-    unsigned long flags;
+    unsigned int flags;
 
     android::base::unique_fd fd(TEMP_FAILURE_RETRY(open(path.c_str(), O_RDONLY | O_CLOEXEC)));
     if (fd == -1) {
@@ -416,7 +416,32 @@ int PrepareAppDirFromRoot(const std::string& path, const std::string& root, int 
     return OK;
 }
 
-status_t PrepareDir(const std::string& path, mode_t mode, uid_t uid, gid_t gid) {
+int SetAttrs(const std::string& path, unsigned int attrs) {
+    unsigned int flags;
+    android::base::unique_fd fd(
+            TEMP_FAILURE_RETRY(open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC)));
+
+    if (fd == -1) {
+        PLOG(ERROR) << "Failed to open " << path;
+        return -1;
+    }
+
+    if (ioctl(fd, FS_IOC_GETFLAGS, &flags)) {
+        PLOG(ERROR) << "Failed to get flags for " << path;
+        return -1;
+    }
+
+    if ((flags & attrs) == attrs) return 0;
+    flags |= attrs;
+    if (ioctl(fd, FS_IOC_SETFLAGS, &flags)) {
+        PLOG(ERROR) << "Failed to set flags for " << path << "(0x" << std::hex << attrs << ")";
+        return -1;
+    }
+    return 0;
+}
+
+status_t PrepareDir(const std::string& path, mode_t mode, uid_t uid, gid_t gid,
+                    unsigned int attrs) {
     std::lock_guard<std::mutex> lock(kSecurityLock);
     const char* cpath = path.c_str();
 
@@ -433,6 +458,9 @@ status_t PrepareDir(const std::string& path, mode_t mode, uid_t uid, gid_t gid) 
         setfscreatecon(nullptr);
         freecon(secontext);
     }
+
+    if (res) return -errno;
+    if (attrs) res = SetAttrs(path, attrs);
 
     if (res == 0) {
         return OK;
@@ -928,10 +956,7 @@ int64_t calculate_dir_size(int dfd) {
             int subfd;
 
             /* always skip "." and ".." */
-            if (name[0] == '.') {
-                if (name[1] == 0) continue;
-                if ((name[1] == '.') && (name[2] == 0)) continue;
-            }
+            if (IsDotOrDotDot(*de)) continue;
 
             subfd = openat(dfd, name, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
             if (subfd >= 0) {
@@ -1104,6 +1129,13 @@ dev_t GetDevice(const std::string& path) {
     }
 }
 
+// Returns true if |path1| names the same existing file or directory as |path2|.
+bool IsSameFile(const std::string& path1, const std::string& path2) {
+    struct stat stbuf1, stbuf2;
+    if (stat(path1.c_str(), &stbuf1) != 0 || stat(path2.c_str(), &stbuf2) != 0) return false;
+    return stbuf1.st_ino == stbuf2.st_ino && stbuf1.st_dev == stbuf2.st_dev;
+}
+
 status_t RestoreconRecursive(const std::string& path) {
     LOG(DEBUG) << "Starting restorecon of " << path;
 
@@ -1228,6 +1260,10 @@ status_t UnmountTree(const std::string& mountPoint) {
     return OK;
 }
 
+bool IsDotOrDotDot(const struct dirent& ent) {
+    return strcmp(ent.d_name, ".") == 0 || strcmp(ent.d_name, "..") == 0;
+}
+
 static status_t delete_dir_contents(DIR* dir) {
     // Shamelessly borrowed from android::installd
     int dfd = dirfd(dir);
@@ -1241,10 +1277,7 @@ static status_t delete_dir_contents(DIR* dir) {
         const char* name = de->d_name;
         if (de->d_type == DT_DIR) {
             /* always skip "." and ".." */
-            if (name[0] == '.') {
-                if (name[1] == 0) continue;
-                if ((name[1] == '.') && (name[2] == 0)) continue;
-            }
+            if (IsDotOrDotDot(*de)) continue;
 
             android::base::unique_fd subfd(
                 openat(dfd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC));

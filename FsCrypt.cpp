@@ -68,6 +68,7 @@ using android::base::StartsWith;
 using android::base::StringPrintf;
 using android::fs_mgr::GetEntryForMountPoint;
 using android::vold::BuildDataPath;
+using android::vold::IsDotOrDotDot;
 using android::vold::IsFilesystemSupported;
 using android::vold::kEmptyAuthentication;
 using android::vold::KeyBuffer;
@@ -141,6 +142,7 @@ static std::vector<std::string> get_ce_key_paths(const std::string& directory_pa
             }
             break;
         }
+        if (IsDotOrDotDot(*entry)) continue;
         if (entry->d_type != DT_DIR || entry->d_name[0] != 'c') {
             LOG(DEBUG) << "Skipping non-key " << entry->d_name;
             continue;
@@ -274,10 +276,9 @@ static bool get_volume_file_encryption_options(EncryptionOptions* options) {
     // HEH as default was always a mistake. Use the libfscrypt default (CTS)
     // for devices launching on versions above Android 10.
     auto first_api_level = GetFirstApiLevel();
-    constexpr uint64_t pre_gki_level = 29;
     auto filenames_mode =
             android::base::GetProperty("ro.crypto.volume.filenames_mode",
-                                       first_api_level > pre_gki_level ? "" : "aes-256-heh");
+                                       first_api_level > __ANDROID_API_Q__ ? "" : "aes-256-heh");
     auto options_string = android::base::GetProperty("ro.crypto.volume.options",
                                                      contents_mode + ":" + filenames_mode);
     if (!ParseOptionsForApiLevel(first_api_level, options_string, options)) {
@@ -401,6 +402,7 @@ static bool load_all_de_keys() {
             }
             break;
         }
+        if (IsDotOrDotDot(*entry)) continue;
         if (entry->d_type != DT_DIR || !is_numeric(entry->d_name)) {
             LOG(DEBUG) << "Skipping non-de-key " << entry->d_name;
             continue;
@@ -802,6 +804,11 @@ bool fscrypt_lock_user_key(userid_t user_id) {
 
 static bool prepare_subdirs(const std::string& action, const std::string& volume_uuid,
                             userid_t user_id, int flags) {
+    // TODO(b/141677108): Remove this & make it the default behavior
+    if (android::base::GetProperty("ro.vold.level_from_user", "0") == "1") {
+        flags |= android::os::IVold::STORAGE_FLAG_LEVEL_FROM_USER;
+    }
+
     if (0 != android::vold::ForkExecvp(
                  std::vector<std::string>{prepare_subdirs_path, action, volume_uuid,
                                           std::to_string(user_id), std::to_string(flags)})) {
@@ -979,6 +986,7 @@ static bool destroy_volume_keys(const std::string& directory_path, const std::st
             }
             break;
         }
+        if (IsDotOrDotDot(*entry)) continue;
         if (entry->d_type != DT_DIR || entry->d_name[0] == '.') {
             LOG(DEBUG) << "Skipping non-user " << entry->d_name;
             continue;

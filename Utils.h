@@ -66,7 +66,8 @@ int PrepareAppDirFromRoot(const std::string& path, const std::string& root, int 
                           bool fixupExisting);
 
 /* fs_prepare_dir wrapper that creates with SELinux context */
-status_t PrepareDir(const std::string& path, mode_t mode, uid_t uid, gid_t gid);
+status_t PrepareDir(const std::string& path, mode_t mode, uid_t uid, gid_t gid,
+                    unsigned int attrs = 0);
 
 /* Really unmounts the path, killing active processes along the way */
 status_t ForceUnmount(const std::string& path);
@@ -153,6 +154,8 @@ std::string BuildDataUserDePath(const std::string& volumeUuid, userid_t userid);
 
 dev_t GetDevice(const std::string& path);
 
+bool IsSameFile(const std::string& path1, const std::string& path2);
+
 status_t EnsureDirExists(const std::string& path, mode_t mode, uid_t uid, gid_t gid);
 
 status_t RestoreconRecursive(const std::string& path);
@@ -165,6 +168,8 @@ bool IsVirtioBlkDevice(unsigned int major);
 
 status_t UnmountTreeWithPrefix(const std::string& prefix);
 status_t UnmountTree(const std::string& mountPoint);
+
+bool IsDotOrDotDot(const struct dirent& ent);
 
 status_t DeleteDirContentsAndDir(const std::string& pathname);
 status_t DeleteDirContents(const std::string& pathname);

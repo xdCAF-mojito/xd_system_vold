@@ -54,6 +54,7 @@ cc_defaults {
         "libdiskconfig",
         "libext4_utils",
         "libf2fs_sparseblock",
+        "libgsi",
         "libhardware",
         "libhardware_legacy",
         "libincfs",
@@ -89,7 +90,7 @@ cc_library_static {
         export_aidl_headers: true,
     },
     whole_static_libs: [
-        "libincremental_aidl-cpp",
+        "libincremental_aidl-unstable-cpp",
     ],
 }
 
