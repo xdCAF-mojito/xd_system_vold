@@ -149,6 +149,14 @@ cc_library_static {
         "model/VolumeEncryption.cpp",
     ],
     product_variables: {
+        arc: {
+            exclude_srcs: [
+                "model/StubVolume.cpp",
+            ],
+            static_libs: [
+                "libarcvolume",
+            ],
+        },
         debuggable: {
             cppflags: ["-D__ANDROID_DEBUGGABLE__"],
         },
@@ -163,6 +171,8 @@ cc_library_static {
     },
     shared_libs: [
         "android.hardware.health.storage@1.0",
+        "android.hardware.health.storage-unstable-ndk_platform",
+        "libbinder_ndk",
     ],
     whole_static_libs: [
         "com.android.sysprop.apex",
@@ -197,7 +207,20 @@ cc_binary {
 
     shared_libs: [
         "android.hardware.health.storage@1.0",
+        "android.hardware.health.storage-unstable-ndk_platform",
+        "libbinder_ndk",
     ],
+
+    product_variables: {
+        arc: {
+            exclude_srcs: [
+                "model/StubVolume.cpp",
+            ],
+            static_libs: [
+                "libarcvolume",
+            ],
+        },
+	},
 }
 
 cc_binary {
