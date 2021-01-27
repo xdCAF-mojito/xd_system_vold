@@ -189,11 +189,6 @@ cc_binary {
 
     srcs: ["main.cpp"],
     static_libs: ["libvold"],
-    product_variables: {
-        device_support_hwfde: {
-            shared_libs: ["libcryptfs_hw"],
-        },
-    },
     init_rc: [
         "vold.rc",
         "wait_for_keymaster.rc",
@@ -220,7 +215,10 @@ cc_binary {
                 "libarcvolume",
             ],
         },
-	},
+        device_support_hwfde: {
+            shared_libs: ["libcryptfs_hw"],
+        },
+    },
 }
 
 cc_binary {
