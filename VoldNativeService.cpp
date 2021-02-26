@@ -377,7 +377,17 @@ binder::Status VoldNativeService::remountAppStorageDirs(int uid, int pid,
     ENFORCE_SYSTEM_OR_ROOT;
     ACQUIRE_LOCK;
 
-    return translate(VolumeManager::Instance()->remountAppStorageDirs(uid, pid, packageNames));
+    return translate(VolumeManager::Instance()->handleAppStorageDirs(uid, pid,
+            false /* doUnmount */, packageNames));
+}
+
+binder::Status VoldNativeService::unmountAppStorageDirs(int uid, int pid,
+        const std::vector<std::string>& packageNames) {
+    ENFORCE_SYSTEM_OR_ROOT;
+    ACQUIRE_LOCK;
+
+    return translate(VolumeManager::Instance()->handleAppStorageDirs(uid, pid,
+            true /* doUnmount */, packageNames));
 }
 
 binder::Status VoldNativeService::setupAppDir(const std::string& path, int32_t appUid) {
@@ -676,15 +686,18 @@ binder::Status VoldNativeService::mountFstab(const std::string& blkDevice,
     ENFORCE_SYSTEM_OR_ROOT;
     ACQUIRE_LOCK;
 
-    return translateBool(fscrypt_mount_metadata_encrypted(blkDevice, mountPoint, false));
+    return translateBool(
+            fscrypt_mount_metadata_encrypted(blkDevice, mountPoint, false, false, "null"));
 }
 
 binder::Status VoldNativeService::encryptFstab(const std::string& blkDevice,
-                                               const std::string& mountPoint) {
+                                               const std::string& mountPoint, bool shouldFormat,
+                                               const std::string& fsType) {
     ENFORCE_SYSTEM_OR_ROOT;
     ACQUIRE_LOCK;
 
-    return translateBool(fscrypt_mount_metadata_encrypted(blkDevice, mountPoint, true));
+    return translateBool(
+            fscrypt_mount_metadata_encrypted(blkDevice, mountPoint, true, shouldFormat, fsType));
 }
 
 binder::Status VoldNativeService::createUserKey(int32_t userId, int32_t userSerial,
