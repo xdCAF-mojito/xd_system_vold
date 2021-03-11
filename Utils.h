@@ -51,9 +51,6 @@ std::string GetFuseMountPathForUser(userid_t user_id, const std::string& relativ
 status_t CreateDeviceNode(const std::string& path, dev_t dev);
 status_t DestroyDeviceNode(const std::string& path);
 
-status_t SetDefaultAcl(const std::string& path, mode_t mode, uid_t uid, gid_t gid,
-                       std::vector<gid_t> additionalGids);
-
 status_t AbortFuseConnections();
 
 int SetQuotaInherit(const std::string& path);
@@ -179,7 +176,13 @@ status_t DeleteDirContents(const std::string& pathname);
 
 status_t WaitForFile(const char* filename, std::chrono::nanoseconds timeout);
 
+bool pathExists(const std::string& path);
+
 bool FsyncDirectory(const std::string& dirname);
+
+bool FsyncParentDirectory(const std::string& path);
+
+bool MkdirsSync(const std::string& path, mode_t mode);
 
 bool writeStringToFile(const std::string& payload, const std::string& filename);
 
