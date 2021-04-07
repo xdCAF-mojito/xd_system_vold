@@ -75,7 +75,6 @@ using android::vold::KeyBuffer;
 using android::vold::KeyGeneration;
 using android::vold::retrieveKey;
 using android::vold::retrieveOrGenerateKey;
-using android::vold::SetDefaultAcl;
 using android::vold::SetQuotaInherit;
 using android::vold::SetQuotaProjectId;
 using android::vold::writeStringToFile;
@@ -472,7 +471,6 @@ bool fscrypt_initialize_systemwide_keys() {
         return false;
     LOG(INFO) << "Wrote per boot key reference to:" << per_boot_ref_filename;
 
-    if (!android::vold::FsyncDirectory(device_key_dir)) return false;
     return true;
 }
 
@@ -662,18 +660,12 @@ static bool read_or_create_volkey(const std::string& misc_path, const std::strin
         if (!android::vold::readSecdiscardable(secdiscardable_path, &secdiscardable_hash))
             return false;
     } else {
-        if (fs_mkdirs(secdiscardable_path.c_str(), 0700) != 0) {
-            PLOG(ERROR) << "Creating directories for: " << secdiscardable_path;
-            return false;
-        }
+        if (!android::vold::MkdirsSync(secdiscardable_path, 0700)) return false;
         if (!android::vold::createSecdiscardable(secdiscardable_path, &secdiscardable_hash))
             return false;
     }
     auto key_path = volkey_path(misc_path, volume_uuid);
-    if (fs_mkdirs(key_path.c_str(), 0700) != 0) {
-        PLOG(ERROR) << "Creating directories for: " << key_path;
-        return false;
-    }
+    if (!android::vold::MkdirsSync(key_path, 0700)) return false;
     android::vold::KeyAuthentication auth("", secdiscardable_hash);
 
     EncryptionOptions options;
@@ -715,7 +707,6 @@ static bool fscrypt_rewrap_user_key(userid_t user_id, int serial,
     if (!get_ce_key_new_path(directory_path, paths, &ce_key_path)) return false;
     if (!android::vold::storeKeyAtomically(ce_key_path, user_key_temp, store_auth, ce_key))
         return false;
-    if (!android::vold::FsyncDirectory(directory_path)) return false;
     return true;
 }
 
@@ -873,15 +864,7 @@ bool fscrypt_prepare_user_storage(const std::string& volume_uuid, userid_t user_
             if (!prepare_dir(misc_ce_path, 01771, AID_SYSTEM, AID_MISC)) return false;
             if (!prepare_dir(vendor_ce_path, 0771, AID_ROOT, AID_ROOT)) return false;
         }
-        if (!prepare_dir(media_ce_path, 02770, AID_MEDIA_RW, AID_MEDIA_RW)) return false;
-        // On devices without sdcardfs (kernel 5.4+), the path permissions aren't fixed
-        // up automatically; therefore, use a default ACL, to ensure apps with MEDIA_RW
-        // can keep reading external storage; in particular, this allows app cloning
-        // scenarios to work correctly on such devices.
-        int ret = SetDefaultAcl(media_ce_path, 02770, AID_MEDIA_RW, AID_MEDIA_RW, {AID_MEDIA_RW});
-        if (ret != android::OK) {
-            return false;
-        }
+        if (!prepare_dir(media_ce_path, 0770, AID_MEDIA_RW, AID_MEDIA_RW)) return false;
 
         if (!prepare_dir(user_ce_path, 0771, AID_SYSTEM, AID_SYSTEM)) return false;
 
