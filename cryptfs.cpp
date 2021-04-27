@@ -478,10 +478,6 @@ const KeyGeneration cryptfs_get_keygen() {
     return KeyGeneration{get_crypto_type().get_keysize(), true, false};
 }
 
-/* Should we use keymaster? */
-static int keymaster_check_compatibility() {
-    return keymaster_compatibility_cryptfs_scrypt();
-}
 
 /* Create a new keymaster key and store it in this footer */
 static int keymaster_create_key(struct crypt_mnt_ftr* ftr) {
@@ -2174,7 +2170,6 @@ static int test_mount_encrypted_fs(struct crypt_mnt_ftr* crypt_ftr, const char* 
     char tmp_mount_point[64];
     unsigned int orig_failed_decrypt_count;
     int rc;
-    int use_keymaster = 0;
     int upgrade = 0;
     unsigned char* intermediate_key = 0;
     size_t intermediate_key_size = 0;
@@ -2256,14 +2251,8 @@ static int test_mount_encrypted_fs(struct crypt_mnt_ftr* crypt_ftr, const char* 
         rc = 0;
 
         // Upgrade if we're not using the latest KDF.
-        use_keymaster = keymaster_check_compatibility();
-        if (crypt_ftr->kdf_type == KDF_SCRYPT_KEYMASTER) {
-            // Don't allow downgrade
-        } else if (use_keymaster == 1 && crypt_ftr->kdf_type != KDF_SCRYPT_KEYMASTER) {
+        if (crypt_ftr->kdf_type != KDF_SCRYPT_KEYMASTER) {
             crypt_ftr->kdf_type = KDF_SCRYPT_KEYMASTER;
-            upgrade = 1;
-        } else if (use_keymaster == 0 && crypt_ftr->kdf_type != KDF_SCRYPT) {
-            crypt_ftr->kdf_type = KDF_SCRYPT;
             upgrade = 1;
         }
 
@@ -2552,20 +2541,7 @@ static int cryptfs_init_crypt_mnt_ftr(struct crypt_mnt_ftr* ftr) {
     ftr->minor_version = CURRENT_MINOR_VERSION;
     ftr->ftr_size = sizeof(struct crypt_mnt_ftr);
     ftr->keysize = get_crypto_type().get_keysize();
-
-    switch (keymaster_check_compatibility()) {
-        case 1:
-            ftr->kdf_type = KDF_SCRYPT_KEYMASTER;
-            break;
-
-        case 0:
-            ftr->kdf_type = KDF_SCRYPT;
-            break;
-
-        default:
-            SLOGE("keymaster_check_compatibility failed");
-            return -1;
-    }
+    ftr->kdf_type = KDF_SCRYPT_KEYMASTER;
 
     get_device_scrypt_params(ftr);
 
