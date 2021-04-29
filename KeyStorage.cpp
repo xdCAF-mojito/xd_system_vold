@@ -165,6 +165,7 @@ bool generateWrappedStorageKey(KeyBuffer* key) {
     std::string key_temp;
     auto paramBuilder = km::AuthorizationSetBuilder().AesEncryptionKey(AES_KEY_BYTES * 8)
         .Authorization(km::TAG_STORAGE_KEY);
+    // TODO(b/187304488): Re-land the below logic. (KM_TAG_FBE_ICE no longer exists)
     /*
     km::KeyParameter param1;
     param1.tag = static_cast<::android::hardware::keymaster::V4_0::Tag>(
@@ -186,7 +187,7 @@ bool exportWrappedStorageKey(const KeyBuffer& kmKey, KeyBuffer* key) {
     auto ret = keymaster.exportKey(kmKey, &key_temp);
     if (ret != km::ErrorCode::OK) {
         if (ret == km::ErrorCode::KEY_REQUIRES_UPGRADE) {
-           // TODO(b/186196505): Re-land the below logic. (keymaster.upgradeKey() was removed)
+           // TODO(b/187304488): Re-land the below logic. (keymaster.upgradeKey() was removed)
            return false;
            /*
            std::string kmKeyStr(reinterpret_cast<const char*>(kmKey.data()), kmKey.size());
