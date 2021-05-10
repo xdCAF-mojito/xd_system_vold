@@ -240,7 +240,12 @@ int SetQuotaProjectId(const std::string& path, long projectId) {
     }
 
     fsx.fsx_projid = projectId;
-    return ioctl(fd, FS_IOC_FSSETXATTR, &fsx);
+    ret = ioctl(fd, FS_IOC_FSSETXATTR, &fsx);
+    if (ret == -1) {
+        PLOG(ERROR) << "Failed to set project id on " << path;
+        return ret;
+    }
+    return 0;
 }
 
 int PrepareDirWithProjectId(const std::string& path, mode_t mode, uid_t uid, gid_t gid,
@@ -499,25 +504,25 @@ status_t ForceUnmount(const std::string& path) {
     return -errno;
 }
 
-status_t KillProcessesWithMountPrefix(const std::string& path) {
-    if (KillProcessesWithMounts(path, SIGINT) == 0) {
+status_t KillProcessesWithTmpfsMountPrefix(const std::string& path) {
+    if (KillProcessesWithTmpfsMounts(path, SIGINT) == 0) {
         return OK;
     }
     if (sSleepOnUnmount) sleep(5);
 
-    if (KillProcessesWithMounts(path, SIGTERM) == 0) {
+    if (KillProcessesWithTmpfsMounts(path, SIGTERM) == 0) {
         return OK;
     }
     if (sSleepOnUnmount) sleep(5);
 
-    if (KillProcessesWithMounts(path, SIGKILL) == 0) {
+    if (KillProcessesWithTmpfsMounts(path, SIGKILL) == 0) {
         return OK;
     }
     if (sSleepOnUnmount) sleep(5);
 
     // Send SIGKILL a second time to determine if we've
     // actually killed everyone mount
-    if (KillProcessesWithMounts(path, SIGKILL) == 0) {
+    if (KillProcessesWithTmpfsMounts(path, SIGKILL) == 0) {
         return OK;
     }
     PLOG(ERROR) << "Failed to kill processes using " << path;
