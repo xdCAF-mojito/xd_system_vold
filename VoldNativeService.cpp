@@ -958,6 +958,7 @@ binder::Status VoldNativeService::incFsEnabled(bool* _aidl_return) {
 
 binder::Status VoldNativeService::mountIncFs(
         const std::string& backingPath, const std::string& targetDir, int32_t flags,
+        const std::string& sysfsName,
         ::android::os::incremental::IncrementalFileSystemControlParcel* _aidl_return) {
     ENFORCE_SYSTEM_OR_ROOT;
     CHECK_ARGUMENT_PATH(backingPath);
@@ -968,7 +969,8 @@ binder::Status VoldNativeService::mountIncFs(
                                  // Mount with read timeouts.
                                  .defaultReadTimeoutMs = INCFS_DEFAULT_READ_TIMEOUT_MS,
                                  // Mount with read logs disabled.
-                                 .readLogBufferPages = 0});
+                                 .readLogBufferPages = 0,
+                                 .sysfsName = sysfsName.c_str()});
     if (!control) {
         return translate(-errno);
     }
