@@ -1754,7 +1754,7 @@ static int wait_and_unmount(const char* mountpoint) {
 
     // Subdirectory mount will cause a failure of umount.
     ensure_subdirectory_unmounted(mountpoint);
-#define WAIT_UNMOUNT_COUNT 200
+#define WAIT_UNMOUNT_COUNT 20
 
     /*  Now umount the tmpfs filesystem */
     for (i = 0; i < WAIT_UNMOUNT_COUNT; i++) {
@@ -1929,7 +1929,6 @@ static int cryptfs_restart_internal(int restart_main) {
          SLOGE("fs_crypto_blkdev not set\n");
          return -1;
     }
-    if (!(rc = wait_and_unmount(DATA_MNT_POINT))) {
 #endif
 #else
     crypto_blkdev = android::base::GetProperty("ro.crypto.fs_crypto_blkdev", "");
@@ -1937,8 +1936,8 @@ static int cryptfs_restart_internal(int restart_main) {
         SLOGE("fs_crypto_blkdev not set\n");
         return -1;
     }
-    if (!(rc = wait_and_unmount(DATA_MNT_POINT))) {
 #endif
+    if (!(rc = wait_and_unmount(DATA_MNT_POINT))) {
         /* If ro.crypto.readonly is set to 1, mount the decrypted
          * filesystem readonly.  This is used when /data is mounted by
          * recovery mode.
@@ -2026,9 +2025,7 @@ static int cryptfs_restart_internal(int restart_main) {
 
         /* Give it a few moments to get started */
         sleep(1);
-#ifndef CONFIG_HW_DISK_ENCRYPT_PERF
     }
-#endif
 
     if (rc == 0) {
         restart_successful = 1;
@@ -2756,31 +2753,6 @@ int cryptfs_enable_internal(int crypt_type, const char* passwd, int no_ui) {
             goto error_shutting_down;
         }
         fclose(breadcrumb);
-    }
-
-    /* Do extra work for a better UX when doing the long inplace encryption */
-    if (!onlyCreateHeader) {
-        /* Now that /data is unmounted, we need to mount a tmpfs
-         * /data, set a property saying we're doing inplace encryption,
-         * and restart the framework.
-         */
-        wait_and_unmount(DATA_MNT_POINT);
-        if (fs_mgr_do_tmpfs_mount(DATA_MNT_POINT)) {
-            goto error_shutting_down;
-        }
-        /* Tells the framework that inplace encryption is starting */
-        property_set("vold.encrypt_progress", "0");
-
-        /* restart the framework. */
-        /* Create necessary paths on /data */
-        prep_data_fs();
-
-        /* Ugh, shutting down the framework is not synchronous, so until it
-         * can be fixed, this horrible hack will wait a moment for it all to
-         * shut down before proceeding.  Without it, some devices cannot
-         * restart the graphics services.
-         */
-        sleep(2);
     }
 
     /* Start the actual work of making an encrypted filesystem */
