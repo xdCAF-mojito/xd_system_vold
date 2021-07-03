@@ -75,6 +75,8 @@ static const char* kFn_secdiscardable = "secdiscardable";
 static const char* kFn_stretching = "stretching";
 static const char* kFn_version = "version";
 
+static const int32_t KM_TAG_FBE_ICE = static_cast<int32_t>(7 << 28) | 16201;
+
 namespace {
 
 // Storage binding info for ensuring key encryption keys include a
@@ -157,14 +159,12 @@ bool generateWrappedStorageKey(KeyBuffer* key) {
     std::string key_temp;
     auto paramBuilder = km::AuthorizationSetBuilder().AesEncryptionKey(AES_KEY_BYTES * 8)
         .Authorization(km::TAG_STORAGE_KEY);
-    // TODO(b/187304488): Re-land the below logic. (KM_TAG_FBE_ICE no longer exists)
-    /*
+
     km::KeyParameter param1;
-    param1.tag = static_cast<::android::hardware::keymaster::V4_0::Tag>(
-        android::hardware::keymaster::V4_0::KM_TAG_FBE_ICE);
-    param1.f.boolValue = true;
+    param1.tag = (km::Tag) (KM_TAG_FBE_ICE);
+    param1.value = km::KeyParameterValue::make<km::KeyParameterValue::boolValue>(true);
     paramBuilder.push_back(param1);
-    */
+
     if (!generateKeymasterKey(keymaster, paramBuilder, &key_temp)) return false;
     *key = KeyBuffer(key_temp.size());
     memcpy(reinterpret_cast<void*>(key->data()), key_temp.c_str(), key->size());
